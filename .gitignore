@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Data and artefacts: NEVER commit these (large, and licence-restricted)
+data/raw/*
+data/processed/*
+outputs/checkpoints/*
+outputs/figures/*
+outputs/logs/*
+!**/.gitkeep
+*.npy
+*.npz
+*.pt
+*.pth
+*.ckpt
+*.dcm
+
+# Secrets / local config
+.env
+configs/local.yaml
+
+# OS / IDE
+.DS_Store
+.vscode/
+.idea/

@@ -1,0 +1,10 @@
+# Conda alternative:  conda env create -f environment.yml && conda activate orthovision
+name: orthovision
+channels: [pytorch, nvidia, conda-forge, defaults]
+dependencies:
+  - python=3.10
+  - pip
+  - pytorch
+  - torchvision
+  - pip:
+      - -r requirements-dev.txt

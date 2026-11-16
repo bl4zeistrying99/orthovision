@@ -1,0 +1,16 @@
+# Install PyTorch FIRST using the command from https://pytorch.org/get-started/locally/
+# (it depends on your CUDA version), then: pip install -r requirements.txt
+# torch / torchvision are intentionally not listed here.
+timm>=1.0
+numpy>=1.26
+pandas>=2.0
+scipy>=1.11
+scikit-learn>=1.3
+pydicom>=2.4
+grad-cam>=1.5          # imported as `pytorch_grad_cam`
+matplotlib>=3.8
+seaborn>=0.13
+streamlit>=1.30
+pyyaml>=6.0
+tqdm>=4.66
+Pillow>=10.0
