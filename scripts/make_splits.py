@@ -26,6 +26,7 @@ split = {
     "val": {"folder": "train", "ids": va},
     "test": {"folder": "valid", "ids": sorted(test_df.index.tolist())},
 }
+out.parent.mkdir(parents=True, exist_ok=True)
 out.write_text(json.dumps(split))
 print(f"Wrote {out}")
 for name in ["train", "val", "test"]:

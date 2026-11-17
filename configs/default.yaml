@@ -18,11 +18,21 @@ data:
 
 train:
   epochs: 30
-  batch_size: 1                      # exam-level bags, as in MRNet; raise with padding collate
+  batch_size: 1                      # exams per step (variable slice counts)
+  accum_steps: 8                     # gradient accumulation -> effective batch of 8 exams
+  eval_batch_size: 1
   lr: 1.0e-4
   weight_decay: 1.0e-2
+  lr_patience: 2                     # halve LR if val macro-AUC stalls this many epochs
   early_stop_patience: 6
+  grad_clip: 1.0
   pooling: max                       # slice -> series (max pooling, per synopsis 4.3)
+  use_pos_weight: true               # weighted BCE (synopsis Eq. 4.1): neg/pos per label
+  amp: true                          # mixed precision on GPU
+  max_slices_train: 24               # random slice subset per plane per step (memory + augmentation)
+  slice_chunk: 24                    # slices pushed through the backbone at once
+  grad_checkpoint: true              # trade ~30% speed for much lower GPU memory
+  freeze_bn: true                    # BatchNorm in eval mode (slices of one exam are not iid)
 
 models:
   names: [resnet50, efficientnet_b0, vit, swin]
