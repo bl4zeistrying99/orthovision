@@ -14,6 +14,7 @@ data/processed/*
 outputs/checkpoints/*
 outputs/figures/*
 outputs/logs/*
+outputs/predictions/*
 !**/.gitkeep
 *.npy
 *.npz
