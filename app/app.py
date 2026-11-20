@@ -340,6 +340,67 @@ def _render_exam_explorer(
                 caption_parts.append(f"Ground Truth: **{gt_str}** ({match_str})")
             st.caption(" · ".join(caption_parts))
 
+    st.divider()
+    st.subheader(f"Knee MRI Scan Viewer — Exam #{exam_id} (Axial · Coronal · Sagittal)")
+    slice_bundle = load_exam_slices(exam_id)
+    if slice_bundle is not None:
+        planes_map = slice_bundle["planes"]
+        source_tag = slice_bundle["source"]
+        img_cols = st.columns(3)
+        slice_counts = []
+        for p_col, plane in zip(img_cols, PLANES):
+            vol = planes_map[plane]
+            n_slices = int(vol.shape[0])
+            slice_counts.append(n_slices)
+            with p_col:
+                st.markdown(f"**{plane.capitalize()} View**")
+                if n_slices > 1:
+                    s_idx = st.slider(
+                        f"{plane.capitalize()} slice",
+                        min_value=0,
+                        max_value=n_slices - 1,
+                        value=n_slices // 2,
+                        key=f"slice_{exam_id}_{plane}",
+                    )
+                else:
+                    s_idx = 0
+                st.image(
+                    vol[s_idx],
+                    caption=f"{plane.capitalize()} · Slice {s_idx + 1} / {n_slices}",
+                    use_container_width=True,
+                    clamp=True,
+                )
+        if source_tag == "mrnet_npy":
+            st.caption(
+                "Source: Full MRNet `.npy` volume (`data/raw/MRNet-v1.0/valid/` or configured override) · "
+                "Phase 5 Grad-CAM heatmaps will overlay directly onto these 3 planes."
+            )
+        else:
+            max_k = max(slice_counts) if slice_counts else 1
+            st.caption(
+                f"Source: {max_k}-slice MRNet PNG preview (`data/processed/exam_previews/`) · "
+                "Phase 5 Grad-CAM heatmaps will overlay directly onto these 3 planes."
+            )
+    else:
+        plane_cards = st.columns(3)
+        for p_col, plane, focus in zip(
+            plane_cards,
+            ("Axial", "Coronal", "Sagittal"),
+            ("Joint effusion & patellar tracking", "Meniscal body & collateral view", "ACL course & posterior horns"),
+        ):
+            with p_col:
+                st.markdown(
+                    f"<div style='border:1px dashed #94a3b8; border-radius:8px; padding:14px; text-align:center;'>"
+                    f"<strong>{plane} View</strong><br><span style='font-size:12px; color:#64748b;'>{focus}</span><br>"
+                    f"<code style='font-size:11px;'>MRI image slot ready</code></div>",
+                    unsafe_allow_html=True,
+                )
+        st.caption(
+            "No local MRI image files found yet in `data/processed/exam_previews/` or `data/raw/MRNet-v1.0/valid/`. "
+            "Drop in exported PNG previews or full MRNet `.npy` scans and refresh — photos appear here automatically."
+        )
+
+    st.divider()
     left_col, right_col = st.columns([1.15, 1.0])
     with left_col:
         st.subheader("Cross-Encoder Agreement")
@@ -351,51 +412,7 @@ def _render_exam_explorer(
         st.info(result.clinical_summary)
 
     with right_col:
-        st.subheader("Multi-Plane MRI & Phase 5 Grad-CAM Slot")
-        volumes = load_exam_slices(exam_id, REPO_ROOT / "data" / "raw" / "MRNet-v1.0")
-        if volumes is not None:
-            plane_cols = st.columns(3)
-            for p_col, plane in zip(plane_cols, PLANES):
-                vol = volumes[plane]
-                with p_col:
-                    s_idx = st.slider(
-                        f"{plane.capitalize()} slice",
-                        min_value=0,
-                        max_value=int(vol.shape[0] - 1),
-                        value=int(vol.shape[0] // 2),
-                        key=f"slice_{exam_id}_{plane}",
-                    )
-                    st.image(vol[s_idx], caption=f"{plane.capitalize()} ({s_idx + 1}/{vol.shape[0]})", use_container_width=True)
-            st.caption("Phase 5 Grad-CAM overlay toggle plugs directly above once `src/orthovision/explain/` is complete.")
-        else:
-            st.markdown(
-                """
-                **Multi-Plane MRNet Input (Axial · Coronal · Sagittal)**
-
-                Raw MRNet `.npy` MRI volumes are not stored inside this lightweight GitHub checkout
-                (`data/raw/` stays outside git for size/license reasons).
-
-                - **What is running right now:** Real locked Phase 3/4 outputs evaluated across **all 3 MRI planes**
-                  on Kaggle T4 for all 4 trained encoders (`ResNet50`, `EfficientNet-B0`, `Swin-Tiny`, `ViT-Base`).
-                - **Phase 5 Plug-in Ready:** `ExamAnalysisResult.gradcam_overlays` and `load_gradcam_overlays()`
-                  in `app/demo_backend.py` are already wired as the drop-in slot for Grad-CAM heatmaps and
-                  anatomical region localization (intercondylar notch / meniscal horns).
-                """
-            )
-            plane_cards = st.columns(3)
-            for p_col, plane, focus in zip(
-                plane_cards,
-                ("Axial", "Coronal", "Sagittal"),
-                ("Joint effusion & patellar tracking", "Meniscal body & collateral view", "ACL course & posterior horns"),
-            ):
-                with p_col:
-                    st.markdown(
-                        f"<div style='border:1px dashed #94a3b8; border-radius:8px; padding:12px; text-align:center;'>"
-                        f"<strong>{plane} View</strong><br><span style='font-size:12px; color:#64748b;'>{focus}</span><br>"
-                        f"<code style='font-size:11px;'>Phase 5 Grad-CAM slot</code></div>",
-                        unsafe_allow_html=True,
-                    )
-
+        st.subheader("Per-Encoder Breakdown & Phase 5 Hook")
         enc_rows = [
             {
                 "Encoder": MODEL_SHORT[enc],
@@ -407,6 +424,12 @@ def _render_exam_explorer(
         ]
         st.markdown("**Per-Encoder Calibrated Probabilities**")
         st.dataframe(pd.DataFrame(enc_rows), use_container_width=True, hide_index=True)
+
+        st.info(
+            "**Phase 5 Grad-CAM Slot Ready:** `ExamAnalysisResult.gradcam_overlays` and "
+            "`load_gradcam_overlays()` in `app/demo_backend.py` are already wired to overlay attention "
+            "heatmaps & anatomical region mapping directly onto the 3 MRI views above."
+        )
 
 
 def _render_benchmark_tab(bundle: Phase4Bundle, calibration_mode: str) -> None:

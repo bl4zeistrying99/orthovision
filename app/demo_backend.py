@@ -13,12 +13,15 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 import json
+import os
 from pathlib import Path
 import sys
 from typing import Any
 
 import numpy as np
 import pandas as pd
+from PIL import Image
+import yaml
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SRC_DIR = REPO_ROOT / "src"
@@ -39,6 +42,7 @@ LABEL_DISPLAY: dict[str, str] = {
     "meniscus": "Meniscus Tear",
 }
 PLANES: tuple[str, ...] = ("axial", "coronal", "sagittal")
+DEFAULT_PREVIEW_ROOT: Path = REPO_ROOT / "data" / "processed" / "exam_previews"
 BASE_ENCODERS: tuple[str, ...] = ("resnet50", "efficientnet_b0", "swin", "vit")
 ALL_MODELS: tuple[str, ...] = (
     "top3_ensemble",
@@ -463,22 +467,84 @@ def get_curated_exam_presets(bundle: Phase4Bundle) -> dict[str, int]:
     }
 
 
+def normalize_slice_for_display(arr: np.ndarray) -> np.ndarray:
+    """Stretch a 2D `(H, W)` or 3D `(S, H, W)` slice array safely to `uint8 [0, 255]`."""
+    data = np.asarray(arr, dtype=np.float32)
+    if data.ndim not in (2, 3):
+        raise ValueError(f"Expected 2D or 3D slice array, got shape {data.shape}")
+    lo, hi = float(data.min()), float(data.max())
+    if hi - lo < 1e-8:
+        return np.zeros_like(data, dtype=np.uint8)
+    scaled = np.clip((data - lo) / (hi - lo), 0.0, 1.0) * 255.0
+    return np.rint(scaled).astype(np.uint8)
+
+
+def resolve_mrnet_data_root(repo_root: Path = REPO_ROOT) -> Path:
+    """Resolve local MRNet root from `ORTHOVISION_DATA_ROOT`, `configs/local.yaml`, or default."""
+    env_root = os.environ.get("ORTHOVISION_DATA_ROOT", "").strip()
+    if env_root:
+        candidate = Path(env_root)
+        if candidate.exists():
+            return candidate
+
+    local_cfg_path = repo_root / "configs" / "local.yaml"
+    if local_cfg_path.exists():
+        cfg = yaml.safe_load(local_cfg_path.read_text(encoding="utf-8")) or {}
+        cfg_root = (cfg.get("paths") or {}).get("data_root")
+        if cfg_root:
+            candidate = Path(cfg_root)
+            if not candidate.is_absolute():
+                candidate = repo_root / candidate
+            if candidate.exists():
+                return candidate
+
+    return repo_root / "data" / "raw" / "MRNet-v1.0"
+
+
 def load_exam_slices(
     exam_id: int,
-    data_root: Path = REPO_ROOT / "data" / "raw" / "MRNet-v1.0",
-) -> dict[str, np.ndarray] | None:
-    """Load local MRNet `valid` `.npy` slice volumes for `(axial, coronal, sagittal)` if present."""
-    valid_dir = data_root / "valid"
-    if not valid_dir.exists():
-        return None
+    data_root: Path | None = None,
+    preview_root: Path | None = None,
+) -> dict[str, Any] | None:
+    """Load local MRNet `.npy` volumes OR pre-exported PNG previews for `(axial, coronal, sagittal)`."""
+    resolved_data_root = Path(data_root) if data_root is not None else resolve_mrnet_data_root()
+    valid_dir = resolved_data_root / "valid"
+    if valid_dir.exists():
+        npy_planes: dict[str, np.ndarray] = {}
+        if all((valid_dir / plane / f"{exam_id:04d}.npy").exists() for plane in PLANES):
+            for plane in PLANES:
+                vol = np.load(valid_dir / plane / f"{exam_id:04d}.npy", mmap_mode="r")
+                npy_planes[plane] = normalize_slice_for_display(vol)
+            return {"source": "mrnet_npy", "planes": npy_planes}
 
-    volumes: dict[str, np.ndarray] = {}
-    for plane in PLANES:
-        vol_path = valid_dir / plane / f"{exam_id:04d}.npy"
-        if not vol_path.exists():
-            return None
-        volumes[plane] = np.load(vol_path, mmap_mode="r")
-    return volumes
+    resolved_preview_root = Path(preview_root) if preview_root is not None else DEFAULT_PREVIEW_ROOT
+    if resolved_preview_root.exists():
+        png_planes: dict[str, np.ndarray] = {}
+        for plane in PLANES:
+            plane_dir = resolved_preview_root / plane
+            if not plane_dir.exists():
+                return None
+            multi = sorted(
+                plane_dir.glob(f"{exam_id:04d}_*.png"),
+                key=lambda p: (
+                    int(p.stem.rsplit("_", 1)[-1])
+                    if "_" in p.stem and p.stem.rsplit("_", 1)[-1].isdigit()
+                    else 0,
+                    p.name,
+                ),
+            )
+            single = plane_dir / f"{exam_id:04d}.png"
+            if multi:
+                frames = [np.asarray(Image.open(p).convert("L"), dtype=np.uint8) for p in multi]
+                png_planes[plane] = normalize_slice_for_display(np.stack(frames, axis=0))
+            elif single.exists():
+                frame = np.asarray(Image.open(single).convert("L"), dtype=np.uint8)
+                png_planes[plane] = normalize_slice_for_display(frame[None, :, :])
+            else:
+                return None
+        return {"source": "preview_png", "planes": png_planes}
+
+    return None
 
 
 def get_benchmark_dataframe(bundle: Phase4Bundle) -> pd.DataFrame:
