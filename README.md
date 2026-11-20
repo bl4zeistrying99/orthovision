@@ -110,28 +110,105 @@ orthovision/
 
 ---
 
-## Quick Start for Teammates
+## Quick Start & Demo Setup
 
-### Option A — Run the Phase 4 Evaluation & Interactive Streamlit Demo (Any CPU Laptop, No GPU/PyTorch Needed)
+Because Stanford MRNet medical scans are license-restricted (`data/README.md`), runtime demo files are split cleanly into two separate bundles (never committed to Git):
+- **Public bundle (`phase4_outputs_public.zip`, `~53 KB` / `21` files):** only evaluation JSONs, training logs, and prediction CSVs (**zero MRI images**).
+- **Private team-only bundle (`mrnet_test_previews_private.zip`, `72.83 MB` / `1,800` PNG slices):** 5 evenly spaced Axial / Coronal / Sagittal preview slices per held-out test exam (`1130`–`1249`), stored privately under team Google Drive (`OrthoVision Backups / Phase4_Demo_Pack / Private_Team_Only_MRNet_Previews`).
 
+---
+
+### Option A — Public Demo Setup (Examiners / External Users — No MRNet Dataset Required)
+
+**Step 1 — Clone & install lightweight CPU dependencies (no PyTorch or GPU needed):**
 ```bash
 git clone https://github.com/bl4zeistrying99/orthovision.git
 cd orthovision
 python -m venv .venv
 # Windows: .venv\Scripts\activate   |   Linux/macOS: source .venv/bin/activate
 pip install streamlit pandas numpy scipy scikit-learn matplotlib pyyaml pytest Pillow
-
-# 1. Run Phase 4 CPU unit tests (6 CPU tests pass; 1 GPU/torch test auto-skips if torch absent)
-python tests/test_phase4.py
-
-# 2. If outputs/predictions/*.csv and outputs/logs/*_seed42/ are restored from Google Drive:
-python scripts/evaluate_phase4.py
-
-# 3. Launch the interactive Streamlit demo
-streamlit run app/app.py
 ```
 
-### Option B — Full Training / Inference Environment (Kaggle Tesla T4 or Local CUDA GPU)
+**Step 2 — Add the public Phase 4 outputs bundle:**
+Download `phase4_outputs_public.zip` (`~53 KB` zip / `0.17 MB` unpacked; contains only metrics, logs, and prediction CSVs — no MRI scans) and unzip it directly into the `orthovision/` repo root (creating `outputs/logs/` and `outputs/predictions/`):
+```powershell
+# Windows (PowerShell, inside orthovision/)
+Expand-Archive -Path "$HOME\Downloads\phase4_outputs_public.zip" -DestinationPath . -Force
+```
+```bash
+# Linux / macOS (inside orthovision/)
+unzip -o ~/Downloads/phase4_outputs_public.zip -d .
+```
+
+**Step 3 — Verify tests & launch the interactive dashboard:**
+```bash
+python tests/test_phase4.py      # 6 CPU tests pass (1 GPU/torch test auto-skips on CPU)
+streamlit run app/app.py         # opens all 4 interactive Phase 4 dashboard tabs
+```
+
+**Step 4 *(Optional, for authorized Stanford MRNet holders)* — Enable knee MRI photos:**  
+Place the official `valid/` directory under `data/raw/MRNet-v1.0/valid/` (or set `ORTHOVISION_DATA_ROOT` / `configs/local.yaml` -> `paths.data_root`). All 3 MRI views (`Axial`, `Coronal`, `Sagittal`) will appear automatically in **Exam Explorer**.
+
+---
+
+### Option B — Team Setup (`MP2026CSE223` — Full Demo with 3-Plane Knee MRI Photos, No `5.7 GB` Download)
+
+1. Complete **Option A (Steps 1–2)** above so `outputs/logs/` and `outputs/predictions/` are in place.
+2. Download `mrnet_test_previews_private.zip` (`72.83 MB`, `1,800` PNG slices for all `120` test exams) from our team's private Google Drive (`OrthoVision Backups / Phase4_Demo_Pack / Private_Team_Only_MRNet_Previews`) and unzip directly into `orthovision/` (creates git-ignored `data/processed/exam_previews/`):
+   ```powershell
+   # Windows (PowerShell, inside orthovision/)
+   Expand-Archive -Path "$HOME\Downloads\mrnet_test_previews_private.zip" -DestinationPath . -Force
+   ```
+3. Launch the dashboard:
+   ```bash
+   streamlit run app/app.py
+   ```
+   All `120` held-out test exams (`1130`–`1249`) now display interactive **Axial**, **Coronal**, and **Sagittal** knee MRI slices (`5` slices per view) automatically.
+
+---
+
+### Expected Folder Structure After Unzipping (External User vs. Team Member)
+
+Check that your folders inside `orthovision/` match one of these two layouts:
+
+#### 1. External User / Examiner (Public Bundle Only — `phase4_outputs_public.zip`, `52.8 KB`)
+Runs all 4 dashboard tabs cleanly with **zero MRI scan files** (the MRI viewer displays clean placeholder cards unless you add your own authorized MRNet `valid/` scans below):
+
+```text
+orthovision/
+├── outputs/
+│   ├── logs/
+│   │   ├── phase4_metrics.json
+│   │   ├── resnet50_seed42/         (log.csv, final_metrics.json)
+│   │   ├── efficientnet_b0_seed42/  (log.csv, final_metrics.json)
+│   │   ├── swin_seed42/             (log.csv, final_metrics.json)
+│   │   └── vit_seed42/              (log.csv, final_metrics.json)
+│   └── predictions/
+│       └── {resnet50,efficientnet_b0,swin,vit,effnet_vit,top3_ensemble}_seed42_{val,test}.csv
+└── data/
+    ├── processed/                   (empty — placeholder MRI cards shown)
+    └── raw/                         (empty; or put MRNet-v1.0/valid/{axial,coronal,sagittal}/1130.npy..1249.npy if authorized)
+```
+
+#### 2. Team Member (`MP2026CSE223` — Public + Private Team Bundle `mrnet_test_previews_private.zip`, `72.8 MB`)
+Includes everything in External User above **plus** the lightweight PNG knee MRI slices (`1,800` PNGs total) so **Exam Explorer** shows real MRI photos with slice sliders:
+
+```text
+orthovision/
+├── outputs/                         (same 21 files from phase4_outputs_public.zip)
+└── data/
+    └── processed/
+        └── exam_previews/           (git-ignored — created by unzipping mrnet_test_previews_private.zip)
+            ├── axial/               (1130_00.png ... 1249_04.png  — 600 PNGs)
+            ├── coronal/             (1130_00.png ... 1249_04.png  — 600 PNGs)
+            └── sagittal/            (1130_00.png ... 1249_04.png  — 600 PNGs)
+```
+
+> **Common Mistake Check:** Always unzip directly into the **`orthovision/`** root folder (`-DestinationPath .` / `-d .`). Never double-nest folders like `outputs/outputs/...` or `data/processed/exam_previews/data/...`, or Streamlit will report missing files.
+
+---
+
+### Option C — Full Training / Inference Environment (Kaggle Tesla T4 or Local CUDA GPU)
 
 ```bash
 # 1) Install PyTorch first from https://pytorch.org/get-started/locally/
@@ -140,6 +217,8 @@ pip install -r requirements-dev.txt
 pip install -e .
 python scripts/check_env.py
 pytest -q
+# Re-run full Phase 4 evaluation anytime from outputs/:
+python scripts/evaluate_phase4.py
 ```
 
 Detailed team onboarding, plain-English explanations of all Phase 0–4 techniques, and what every GitHub commit changed are in [`docs/TEAM_GUIDE.md`](docs/TEAM_GUIDE.md).

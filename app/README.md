@@ -12,13 +12,13 @@ From the repository root (`orthovision/`):
 streamlit run app/app.py
 ```
 
-### Prerequisites
-- Python packages: `streamlit`, `pandas`, `numpy`, `scipy`, `scikit-learn`, `matplotlib`, `Pillow`, `pyyaml`.
-- Local output files in `outputs/predictions/` and `outputs/logs/` (if cloning fresh on a new laptop, restore them from Google Drive `OrthoVision Backups` and run `python scripts/evaluate_phase4.py`).
+### Prerequisites & Data Bundles
+- **Python packages:** `streamlit`, `pandas`, `numpy`, `scipy`, `scikit-learn`, `matplotlib`, `Pillow`, `pyyaml`.
+- **Public Bundle (`phase4_outputs_public.zip`, `~53 KB`):** unzip into the repo root (`orthovision/`) to populate git-ignored `outputs/predictions/` and `outputs/logs/` (zero MRI images; safe for public sharing).
 - **Knee MRI Scan Display (optional, auto-detected):**
-  - **Lightweight PNG previews:** place exported PNG slices under git-ignored `data/processed/exam_previews/{axial,coronal,sagittal}/` (`1130_00.png`..`1249_04.png` or `1130.png`), OR
-  - **Full MRNet `.npy` volumes:** place raw scans under `data/raw/MRNet-v1.0/valid/` (or point `ORTHOVISION_DATA_ROOT` / `configs/local.yaml` -> `paths.data_root` to your local MRNet folder).
-  When present, the **Exam Explorer** shows interactive Axial / Coronal / Sagittal MRI slices; when absent, it degrades gracefully to placeholder cards.
+  - **Private Team Bundle (`mrnet_test_previews_private.zip`, `72.83 MB`):** team-only archive on Google Drive (`OrthoVision Backups / Phase4_Demo_Pack / Private_Team_Only_MRNet_Previews`). Unzip into `orthovision/` to populate git-ignored `data/processed/exam_previews/{axial,coronal,sagittal}/` (`1130_00.png`..`1249_04.png`).
+  - **Full MRNet `.npy` volumes (if you hold Stanford MRNet access):** place scans under `data/raw/MRNet-v1.0/valid/` (or point `ORTHOVISION_DATA_ROOT` / `configs/local.yaml` -> `paths.data_root` to your local MRNet folder).
+  When present, the **Exam Explorer** shows interactive Axial / Coronal / Sagittal MRI slices; when absent, it degrades gracefully to placeholder cards while all 4 analytics tabs remain fully interactive.
 
 ## How Phases 5 & 6 Plug Into `app/demo_backend.py`
 - **Phase 5 (Grad-CAM + Region Mapping):** implement `load_gradcam_overlays(exam_id)` to return per-plane overlay images and anatomical region scores inside `ExamAnalysisResult.gradcam_overlays`.
